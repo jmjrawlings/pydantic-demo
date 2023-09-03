@@ -1,3 +1,9 @@
+"""
+A demo of using pydantic to declare
+a simple data model along with inheritance
+and se/deserialization
+"""
+
 import pydantic
 from datetime import datetime
 from typing import Tuple, List, Dict, TypeVar
@@ -8,36 +14,46 @@ T = TypeVar("T")
 Id = TypeVar("Id", bound=int)
 Collection = Dict[int, T]
 
-"""
-All our model classes must implement this.
-Simply enforces that we have an Id and Name
-for everything.
-"""
-
 MAX_ID = 0
 def new_id():
+    """
+    Create a new ID - production would probably use `UUID`
+    """
     global MAX_ID
     MAX_ID += 1
     return MAX_ID
 
+
 class Base(BaseModel):
+    """
+    We can declare our own base type for all
+    other model classes to inherit from.
+    In this example we want to enforce that
+    everything in our model has both a `id`
+    and a `name`
+    """
     id: Id = Field(default_factory=new_id)
     name: str = Field(default="")
 
     def __str__(self):
         return self.name
 
+
 class Location(Base):
-    pass
+    longitude : float
+    latitude : float
+
 
 class Route(Base):
     origin_location_id : Id
     destination_location_id : Id
     location_ids : List[Id]
 
+
 class Ship(Base):
     length : float
     weight : float    
+
 
 class RouteAssignment(Base):
     ship_id : Id
@@ -59,10 +75,10 @@ def collection(*args):
     return {arg.id : arg for arg in args}
 
 # Create dummy locations
-loc_a = Location(name = "Loc A")
-loc_b = Location(name = "Loc B")
-loc_c = Location(name = "Loc C")
-loc_d = Location(name = "Loc D")
+loc_a = Location(name = "Loc A", longitude=43.5, latitude=120.1)
+loc_b = Location(name = "Loc B", longitude=44.5, latitude=125.1)
+loc_c = Location(name = "Loc C", longitude=45.5, latitude=122.1)
+loc_d = Location(name = "Loc D", longitude=46.5, latitude=121.1)
 locations = collection(loc_a, loc_b, loc_c, loc_d)
 
 # Create dummy ships
@@ -100,13 +116,17 @@ model1 = Model(name = "Sample Model",
               assignments=assignments)
 
 
-# Test read and write
+# Write the model to dict/json
 model1_dict = model1.model_dump()
 model1_json = model1.model_dump_json()
 
-# Read from file
+# Read from json (this will be a deepcopy)
 model2 = Model.model_validate_json(model1_json)
 model2.name = "Model 2"
 
-# Or copy directly with some edits
-model3 = model1.model_copy(name="Model 3", id=new_id())
+# Read from dict (this will probably share references so be careful)
+model3 = Model.model_validate(model1_dict)
+model3.name = "Model 3"
+
+# Use the inbuilt copy method (best idea)
+model4 = model1.model_copy(update=dict(name="Model 4"), deep=True)
